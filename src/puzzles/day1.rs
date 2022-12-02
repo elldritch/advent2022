@@ -63,10 +63,11 @@ pub fn part2(input: String) -> u32 {
     top_elf_calories[1] + top_elf_calories[2] + top_elf_calories[3]
 }
 
+#[cfg(test)]
 mod tests {
     use super::*;
 
-    const example_input: &str = "1000
+    const EXAMPLE_INPUT: &str = "1000
 2000
 3000
 
@@ -84,11 +85,11 @@ mod tests {
 
     #[test]
     fn test_part1() {
-        assert_eq!(part1(example_input.into()), 24000)
+        assert_eq!(part1(EXAMPLE_INPUT.into()), 24000)
     }
 
     #[test]
     fn test_part2() {
-        assert_eq!(part2(example_input.into()), 45000)
+        assert_eq!(part2(EXAMPLE_INPUT.into()), 45000)
     }
 }
