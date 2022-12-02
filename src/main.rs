@@ -25,22 +25,26 @@ fn main() {
     let args = Args::parse();
 
     let input =
-        fs::read_to_string(args.input_filepath).unwrap_or_else(|err: std::io::Error| -> String {
+        fs::read_to_string(&args.input_filepath).unwrap_or_else(|err: std::io::Error| -> String {
             println!("Could not open puzzle input file: {}", err);
             exit(1)
         });
 
     match args.day {
-        1 => match args.part {
-            1 => println!("{}", puzzles::day1::part1(input)),
-            2 => println!("{}", puzzles::day1::part2(input)),
-            _ => println!("Unknown puzzle part: day {}, part {}", args.day, args.part),
-        },
-        2 => match args.part {
-            1 => println!("{}", puzzles::day2::part1(input)),
-            2 => println!("{}", puzzles::day2::part2(input)),
-            _ => println!("Unknown puzzle part: day {}, part {}", args.day, args.part),
-        },
+        1 => run_day(puzzles::day1::part1, puzzles::day1::part2, args, input),
+        2 => run_day(puzzles::day2::part1, puzzles::day2::part2, args, input),
         _ => println!("Unknown puzzle day: {}", args.day),
+    }
+}
+
+fn run_day<F1, F2>(part1: F1, part2: F2, args: Args, input: String)
+where
+    F1: Fn(String) -> u32,
+    F2: Fn(String) -> u32,
+{
+    match args.part {
+        1 => println!("{}", part1(input)),
+        2 => println!("{}", part2(input)),
+        _ => println!("Unknown puzzle part: day {}, part {}", args.day, args.part),
     }
 }

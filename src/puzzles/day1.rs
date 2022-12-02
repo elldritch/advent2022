@@ -23,6 +23,9 @@ pub fn part1(input: String) -> u32 {
             current_elf_calories += calories;
         }
     }
+    if current_elf_calories > current_max_elf_calories {
+        current_max_elf_calories = current_elf_calories;
+    }
 
     current_max_elf_calories
 }
