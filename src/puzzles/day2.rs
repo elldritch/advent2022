@@ -85,7 +85,7 @@ pub fn part2(input: String) -> u32 {
         assert_eq!(chars.next(), Some(' '));
         let outcome = {
             let player_move = chars.next().unwrap_or_else(|| -> char {
-                println!("Impossible: line did not contain player move");
+                println!("Impossible: line did not contain game outcome");
                 exit(1)
             });
             match player_move {
@@ -93,7 +93,7 @@ pub fn part2(input: String) -> u32 {
                 'Y' => Draw,
                 'Z' => Win,
                 _ => {
-                    println!("Invalid player move: {}", player_move);
+                    println!("Invalid game outcome: {}", player_move);
                     exit(1)
                 }
             }
