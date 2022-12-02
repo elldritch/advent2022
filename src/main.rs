@@ -24,8 +24,8 @@ struct Args {
 fn main() {
     let args = Args::parse();
 
-    let input = fs::read_to_string(args.input_filepath)
-        .unwrap_or_else(|err: std::io::Error| -> String {
+    let input =
+        fs::read_to_string(args.input_filepath).unwrap_or_else(|err: std::io::Error| -> String {
             println!("Could not open puzzle input file: {}", err);
             exit(1)
         });
@@ -34,8 +34,8 @@ fn main() {
         1 => match args.part {
             1 => puzzles::day1::part1(input),
             2 => puzzles::day1::part2(input),
-            _ => println!("Unknown puzzle part: day {}, part {}", args.day, args.part)
-        }
-        _ => println!("Unknown puzzle day: {}", args.day)
+            _ => println!("Unknown puzzle part: day {}, part {}", args.day, args.part),
+        },
+        _ => println!("Unknown puzzle day: {}", args.day),
     }
 }
