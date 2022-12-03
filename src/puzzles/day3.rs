@@ -1,12 +1,14 @@
-use std::{process::exit, collections::HashSet};
+use std::{collections::HashSet, process::exit, str::Lines};
+
+use itertools::{Chunk, Itertools};
 
 // In the first compartment, build a set of encountered items. In the second
 // compartment, check for items previously seen in the first compartment.
 pub fn part1(input: String) -> u32 {
-    let lines = input.lines();
+    let rucksacks = input.lines();
 
     let mut duplicate_priorities = 0;
-    for rucksack in lines {
+    for rucksack in rucksacks {
         let len = rucksack.len();
         let mut chars = rucksack.chars();
         assert_eq!(len % 2, 0);
@@ -30,7 +32,7 @@ pub fn part1(input: String) -> u32 {
             });
             if seen.contains(&c) {
                 duplicate_priorities += item_priority(c);
-                break
+                break;
             }
         }
     }
@@ -50,7 +52,45 @@ fn item_priority(item: char) -> u32 {
 }
 
 pub fn part2(input: String) -> u32 {
-    panic!("not yet implemented")
+    let groups = input.lines().chunks(3);
+
+    let mut badge_priorities = 0;
+    for mut group in &groups {
+        // Build a set out of each group member's rucksack items.
+        let first_rucksack = next_rucksack_set(&mut group);
+        let second_rucksack = next_rucksack_set(&mut group);
+        let third_rucksack = next_rucksack_set(&mut group);
+        assert_eq!(group.next(), None);
+
+        // Find the intersection of all rucksacks.
+        let common: HashSet<char> = first_rucksack
+            .intersection(&second_rucksack)
+            .copied()
+            .collect::<HashSet<char>>()
+            .intersection(&third_rucksack)
+            .copied()
+            .collect();
+        assert_eq!(common.len(), 1);
+        let badge = common
+            .iter()
+            .exactly_one()
+            .copied()
+            .unwrap_or_else(|err| -> char {
+                println!("Group did not contain exactly one badge: {}", err);
+                exit(1)
+            });
+        badge_priorities += item_priority(badge)
+    }
+
+    badge_priorities
+}
+
+fn next_rucksack_set(group: &mut Chunk<Lines>) -> HashSet<char> {
+    let rucksack = group.next().unwrap_or_else(|| -> &str {
+        println!("Impossible: group did not contain three rucksacks");
+        exit(1)
+    });
+    rucksack.chars().collect()
 }
 
 #[cfg(test)]
