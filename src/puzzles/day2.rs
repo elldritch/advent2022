@@ -148,7 +148,8 @@ mod tests {
 
     const EXAMPLE_INPUT: &str = "A Y
 B X
-C Z";
+C Z
+";
 
     #[test]
     fn test_part1() {
