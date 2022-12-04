@@ -5,8 +5,24 @@ use nom::multi::many1;
 use nom::sequence::terminated;
 use nom::{sequence::separated_pair, IResult};
 
+type Section = (u32, u32);
+
 pub fn part1(input: String) -> u32 {
-    let pairs = match parse(&input) {
+    count_pairs(
+        |(a, b)| -> bool { within(a, b) || within(b, a) },
+        input.as_str(),
+    )
+}
+
+pub fn part2(input: String) -> u32 {
+    count_pairs(overlaps, input.as_str())
+}
+
+fn count_pairs<F>(predicate: F, input: &str) -> u32
+where
+    F: Fn(&&((u32, u32), (u32, u32))) -> bool,
+{
+    let pairs = match parse(input) {
         Ok(("", pairs)) => pairs,
         Ok((remaining, _)) => {
             println!(
@@ -21,21 +37,21 @@ pub fn part1(input: String) -> u32 {
         }
     };
 
-    pairs
-        .iter()
-        .filter(|(a, b)| -> bool { within(a, b) || within(b, a) })
-        .count() as u32
+    pairs.iter().filter(predicate).count() as u32
 }
 
 fn within(a: &Section, b: &Section) -> bool {
     a.0 >= b.0 && a.1 <= b.1
 }
 
-fn parse(input: &String) -> IResult<&str, Vec<(Section, Section)>> {
-    many1(terminated(pair, newline))(input.as_str())
+fn overlaps(input: &&(Section, Section)) -> bool {
+    let (a, b) = input;
+    a.1 >= b.0 && b.1 >= a.0
 }
 
-type Section = (u32, u32);
+fn parse(input: &str) -> IResult<&str, Vec<(Section, Section)>> {
+    many1(terminated(pair, newline))(input)
+}
 
 fn pair(input: &str) -> IResult<&str, (Section, Section)> {
     separated_pair(section, char(','), section)(input)
@@ -43,10 +59,6 @@ fn pair(input: &str) -> IResult<&str, (Section, Section)> {
 
 fn section(input: &str) -> IResult<&str, Section> {
     separated_pair(u32, char('-'), u32)(input)
-}
-
-pub fn part2(input: String) -> u32 {
-    todo!("not yet implemented")
 }
 
 #[cfg(test)]
@@ -68,7 +80,6 @@ mod tests {
 
     #[test]
     fn test_part2() {
-        todo!("part 2 not yet unlocked");
-        // assert_eq!(part2(EXAMPLE_INPUT.into()), 0)
+        assert_eq!(part2(EXAMPLE_INPUT.into()), 4)
     }
 }
