@@ -1,9 +1,9 @@
 pub fn part1(input: String) -> u32 {
-  panic!("not yet implemented")
+  todo!("not yet implemented")
 }
 
 pub fn part2(input: String) -> u32 {
-  panic!("not yet implemented")
+  todo!("not yet implemented")
 }
 
 #[cfg(test)]
@@ -25,7 +25,7 @@ mod tests {
 
   #[test]
   fn test_part2() {
-      panic!("part 2 not yet unlocked");
+      todo!("part 2 not yet unlocked");
       // assert_eq!(part2(EXAMPLE_INPUT.into()), 0)
   }
 }
