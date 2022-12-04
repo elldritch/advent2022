@@ -1,9 +1,11 @@
 use std::process::exit;
 
-use nom::character::complete::{char, newline, u32};
-use nom::multi::many1;
-use nom::sequence::terminated;
-use nom::{sequence::separated_pair, IResult};
+use nom::{
+    character::complete::{char, newline, u32},
+    multi::many1,
+    sequence::{separated_pair, terminated},
+    IResult,
+};
 
 type Section = (u32, u32);
 
