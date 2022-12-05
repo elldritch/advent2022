@@ -1,4 +1,4 @@
-use std::{fs, process::exit};
+use std::{fmt::Display, fs, process::exit};
 
 use clap::Parser;
 
@@ -39,10 +39,12 @@ fn main() {
     }
 }
 
-fn run_day<F1, F2>(part1: F1, part2: F2, args: Args, input: String)
+fn run_day<F1, F2, R1, R2>(part1: F1, part2: F2, args: Args, input: String)
 where
-    F1: Fn(String) -> u32,
-    F2: Fn(String) -> u32,
+    R1: Display,
+    R2: Display,
+    F1: Fn(String) -> R1,
+    F2: Fn(String) -> R2,
 {
     match args.part {
         1 => println!("{}", part1(input)),
