@@ -10,17 +10,11 @@ pub fn part2(input: String) -> u32 {
 mod tests {
   use super::*;
 
-  const EXAMPLE_INPUT: &str = "2-4,6-8
-2-3,4-5
-5-7,7-9
-2-8,3-7
-6-6,4-6
-2-6,4-8
-";
+  const EXAMPLE_INPUT: &str = "";
 
   #[test]
   fn test_part1() {
-      assert_eq!(part1(EXAMPLE_INPUT.into()), 2)
+      assert_eq!(part1(EXAMPLE_INPUT.into()), 0)
   }
 
   #[test]
