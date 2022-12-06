@@ -1,14 +1,14 @@
 use std::{collections::HashSet, process::exit};
 
-pub fn part1(input: String) -> u32 {
+pub fn part1(input: String) -> usize {
     find_marker(4, input)
 }
 
-pub fn part2(input: String) -> u32 {
+pub fn part2(input: String) -> usize {
     find_marker(14, input)
 }
 
-pub fn find_marker(window_size: usize, input: String) -> u32 {
+pub fn find_marker(window_size: usize, input: String) -> usize {
     for (i, window) in input
         .chars()
         .collect::<Vec<char>>()
@@ -17,7 +17,7 @@ pub fn find_marker(window_size: usize, input: String) -> u32 {
         .enumerate()
     {
         if window.iter().collect::<HashSet<&char>>().len() == window_size {
-            return (i + window_size) as u32;
+            return i + window_size;
         }
     }
     println!("Impossible: no marker value detected");

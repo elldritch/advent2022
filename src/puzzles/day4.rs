@@ -7,25 +7,25 @@ use nom::{
 
 type Section = (u32, u32);
 
-pub fn part1(input: String) -> u32 {
+pub fn part1(input: String) -> usize {
     count_pairs(
         |(a, b)| -> bool { within(a, b) || within(b, a) },
         input.as_str(),
     )
 }
 
-pub fn part2(input: String) -> u32 {
+pub fn part2(input: String) -> usize {
     count_pairs(overlaps, input.as_str())
 }
 
-fn count_pairs<F>(predicate: F, input: &str) -> u32
+fn count_pairs<F>(predicate: F, input: &str) -> usize
 where
     F: Fn(&&((u32, u32), (u32, u32))) -> bool,
 {
     super::shared::must_parse(parse, input)
         .iter()
         .filter(predicate)
-        .count() as u32
+        .count()
 }
 
 fn within(a: &Section, b: &Section) -> bool {
