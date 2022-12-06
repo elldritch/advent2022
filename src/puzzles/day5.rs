@@ -11,28 +11,25 @@ use nom::{
     IResult, InputLength, Parser,
 };
 
-pub fn part1(input: String) -> String {
+// The top of the column is the back.
+type Column = VecDeque<char>;
+
+type Crates = Vec<Column>;
+
+fn simulate_crane<F>(input: String, mut f: F) -> String
+where
+    F: FnMut(&mut Crates, Vec<Step>),
+{
     let (mut crates, steps) = super::shared::must_parse(parse_puzzle, input.as_str());
 
-    for step in steps {
-        for _ in 0..step.quantity {
-            let label = match crates[step.from].pop_back() {
-                Some(label) => label,
-                None => {
-                    println!("Impossible: steps resulted in invalid state: {:?}", crates);
-                    exit(1);
-                }
-            };
-            crates[step.to].push_back(label);
-        }
-    }
+    f(&mut crates, steps);
 
     let mut message = String::new();
     for column in &crates {
         match column.back() {
             Some(label) => message.push(*label),
             None => {
-                println!("Impossible: steps resulted in invalid state: {:?}", crates);
+                println!("Impossible: steps resulted in invalid state: {:?}", &crates);
                 exit(1);
             }
         }
@@ -41,7 +38,24 @@ pub fn part1(input: String) -> String {
     message
 }
 
-fn parse_puzzle(input: &str) -> IResult<&str, (Vec<VecDeque<char>>, Vec<Step>)> {
+pub fn part1(input: String) -> String {
+    simulate_crane(input, |crates, steps| {
+        for step in steps {
+            for _ in 0..step.quantity {
+                let label = match crates[step.from].pop_back() {
+                    Some(label) => label,
+                    None => {
+                        println!("Impossible: steps resulted in invalid state: {:?}", crates);
+                        exit(1);
+                    }
+                };
+                crates[step.to].push_back(label);
+            }
+        }
+    })
+}
+
+fn parse_puzzle(input: &str) -> IResult<&str, (Crates, Vec<Step>)> {
     // Parse crate layout.
     let (input, first_row) = row_of_crates(input)?;
     let num_crates = first_row.len();
@@ -49,10 +63,10 @@ fn parse_puzzle(input: &str) -> IResult<&str, (Vec<VecDeque<char>>, Vec<Step>)> 
         many_till(row_of_crates_n(num_crates), column_numbers(num_crates))(input)?;
 
     // Construct crate layout.
-    let mut crates: Vec<VecDeque<char>> = Vec::new();
+    let mut crates = Vec::new();
     // Put together the column vector using the first row.
     for crate_ in first_row {
-        let mut column: VecDeque<char> = VecDeque::new();
+        let mut column = VecDeque::new();
         match crate_ {
             Some(label) => column.push_front(label),
             None => {}
@@ -90,7 +104,7 @@ fn step(input: &str) -> IResult<&str, Step> {
             newline,
         )),
         |(_, quantity, _, from, _, to, _)| Step {
-            quantity,
+            quantity: quantity as usize,
             from: (from - 1) as usize,
             to: (to - 1) as usize,
         },
@@ -146,12 +160,20 @@ fn column_number(input: &str) -> IResult<&str, u8> {
 }
 
 pub fn part2(input: String) -> String {
-    todo!("not yet implemented")
+    simulate_crane(input, |crates, steps| {
+        for step in steps {
+            let from = &mut crates[step.from];
+            let mut picked_up = from
+                .drain((from.len() - step.quantity)..)
+                .collect::<VecDeque<char>>();
+            crates[step.to].append(&mut picked_up);
+        }
+    })
 }
 
 #[derive(Debug)]
 struct Step {
-    quantity: u32,
+    quantity: usize,
     from: usize,
     to: usize,
 }
