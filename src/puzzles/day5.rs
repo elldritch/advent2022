@@ -12,20 +12,7 @@ use nom::{
 };
 
 pub fn part1(input: String) -> String {
-    let (mut crates, steps) = match parse_puzzle(input.as_str()) {
-        Ok(("", parsed)) => parsed,
-        Ok((remaining, _)) => {
-            println!(
-                "Invalid puzzle input: could not parse input suffix: {}",
-                remaining
-            );
-            exit(1)
-        }
-        Err(err) => {
-            println!("Could not parse puzzle input: {}", err);
-            exit(1)
-        }
-    };
+    let (mut crates, steps) = super::shared::must_parse(parse_puzzle, input.as_str());
 
     for step in steps {
         for _ in 0..step.quantity {
@@ -191,7 +178,6 @@ move 1 from 1 to 2
 
     #[test]
     fn test_part2() {
-        todo!("part 2 not yet unlocked");
-        // assert_eq!(part2(EXAMPLE_INPUT.into()), "")
+        assert_eq!(part2(EXAMPLE_INPUT.into()), "MCD")
     }
 }

@@ -1,5 +1,3 @@
-use std::process::exit;
-
 use nom::{
     character::complete::{char, newline, u32},
     multi::many1,
@@ -24,22 +22,10 @@ fn count_pairs<F>(predicate: F, input: &str) -> u32
 where
     F: Fn(&&((u32, u32), (u32, u32))) -> bool,
 {
-    let pairs = match parse(input) {
-        Ok(("", pairs)) => pairs,
-        Ok((remaining, _)) => {
-            println!(
-                "Invalid puzzle input: could not parse input suffix: {}",
-                remaining
-            );
-            exit(1)
-        }
-        Err(err) => {
-            println!("Could not parse puzzle input: {}", err);
-            exit(1)
-        }
-    };
-
-    pairs.iter().filter(predicate).count() as u32
+    super::shared::must_parse(parse, input)
+        .iter()
+        .filter(predicate)
+        .count() as u32
 }
 
 fn within(a: &Section, b: &Section) -> bool {
