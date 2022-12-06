@@ -1,23 +1,27 @@
 use std::{collections::HashSet, process::exit};
 
 pub fn part1(input: String) -> u32 {
+    find_marker(4, input)
+}
+
+pub fn part2(input: String) -> u32 {
+    find_marker(14, input)
+}
+
+pub fn find_marker(window_size: usize, input: String) -> u32 {
     for (i, window) in input
         .chars()
         .collect::<Vec<char>>()
         .as_slice()
-        .windows(4)
+        .windows(window_size)
         .enumerate()
     {
-        if window.iter().collect::<HashSet<&char>>().len() == 4 {
-            return (i + 4) as u32;
+        if window.iter().collect::<HashSet<&char>>().len() == window_size {
+            return (i + window_size) as u32;
         }
     }
     println!("Impossible: no marker value detected");
     exit(1)
-}
-
-pub fn part2(input: String) -> u32 {
-    todo!()
 }
 
 #[cfg(test)]
@@ -41,6 +45,10 @@ mod tests {
 
     #[test]
     fn test_part2() {
-        assert_eq!(part2(EXAMPLE_INPUT_1.into()), 0)
+        assert_eq!(part2(EXAMPLE_INPUT_1.into()), 19);
+        assert_eq!(part2(EXAMPLE_INPUT_2.into()), 23);
+        assert_eq!(part2(EXAMPLE_INPUT_3.into()), 23);
+        assert_eq!(part2(EXAMPLE_INPUT_4.into()), 29);
+        assert_eq!(part2(EXAMPLE_INPUT_5.into()), 26);
     }
 }
