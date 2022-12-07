@@ -1,4 +1,6 @@
-use std::{cell::RefCell, cmp::min, collections::HashMap, process::exit, rc::Rc, u32::MAX};
+use std::{
+    cell::RefCell, cmp::min, collections::HashMap, ops::Add, process::exit, rc::Rc, u32::MAX,
+};
 
 use nom::{
     branch::alt,
@@ -17,27 +19,20 @@ pub fn part1(input: String) -> u32 {
     let root = parse_filesystem(input.as_str());
 
     // Traverse the tree from the bottom up, computing total sizes.
-    let (_, count) = count_subdirs_by_size(&root.borrow());
+    let (_, counted_size) = traverse_filesystem(
+        &root.borrow(),
+        0,
+        Add::add,
+        |total_size, subdir_counted_size| {
+            if total_size <= 100_000 {
+                total_size + subdir_counted_size
+            } else {
+                subdir_counted_size
+            }
+        },
+    );
 
-    count
-}
-
-type TotalSize = u32;
-
-type CountedSize = u32;
-
-fn count_subdirs_by_size(dir: &Directory) -> (TotalSize, CountedSize) {
-    let direct_size: u32 = dir.files.iter().map(|(_, size)| size).copied().sum();
-    let (subdir_total_size, subdir_counted_size) = dir
-        .dirs
-        .iter()
-        .map(|(_, subdir)| count_subdirs_by_size(&subdir.borrow()))
-        .fold((0, 0), |(a, b), (c, d)| (a + c, b + d));
-    let total_size = direct_size + subdir_total_size;
-    (
-        total_size,
-        if total_size <= 100_000 { total_size } else { 0 } + subdir_counted_size,
-    )
+    counted_size
 }
 
 pub fn part2(input: String) -> u32 {
@@ -46,37 +41,57 @@ pub fn part2(input: String) -> u32 {
     // Compute space needed.
     let space_available = 70_000_000;
     let space_needed = 30_000_000;
-    let (space_used, _) = count_subdirs_by_size(&root.borrow());
+    let (space_used, _) = traverse_filesystem(&root.borrow(), 0, |_, _| 0, |_, _| 0);
     let min_space_to_delete = space_used - (space_available - space_needed);
 
     // Find the smallest directory larger than the threshold.
-    let (_, smallest_to_delete_size) =
-        smallest_subdir_over_threshold(&root.borrow(), min_space_to_delete);
+    let (_, smallest_to_delete_size) = traverse_filesystem(
+        &root.borrow(),
+        MAX,
+        min,
+        |total_size, subdir_smallest_deletable_size| {
+            if total_size > min_space_to_delete {
+                min(total_size, subdir_smallest_deletable_size)
+            } else {
+                subdir_smallest_deletable_size
+            }
+        },
+    );
 
     smallest_to_delete_size
 }
 
-type SmallestSoFarSize = u32;
+type TotalSize = u32;
 
-fn smallest_subdir_over_threshold(
+fn traverse_filesystem<T, F, F2>(
     dir: &Directory,
-    threshold: u32,
-) -> (TotalSize, SmallestSoFarSize) {
+    combine_result_init: T,
+    combine_result: F,
+    make_result: F2,
+) -> (TotalSize, T)
+where
+    T: Copy,
+    F: Fn(T, T) -> T + Copy,
+    F2: Fn(TotalSize, T) -> T + Copy,
+{
     let direct_size: u32 = dir.files.iter().map(|(_, size)| size).copied().sum();
-    let (subdir_total_size, subdir_smallest_so_far_size) = dir
+    let (subdir_total_size, subdir_result) = dir
         .dirs
         .iter()
-        .map(|(_, subdir)| smallest_subdir_over_threshold(&subdir.borrow(), threshold))
-        .fold((0, MAX), |(a, b), (c, d)| (a + c, min(b, d)));
+        .map(|(_, subdir)| {
+            traverse_filesystem(
+                &subdir.borrow(),
+                combine_result_init,
+                combine_result,
+                make_result,
+            )
+        })
+        .fold((0, combine_result_init), |(a, b), (c, d)| {
+            (a + c, combine_result(b, d))
+        });
+
     let total_size = direct_size + subdir_total_size;
-    (
-        total_size,
-        if total_size > threshold {
-            min(total_size, subdir_smallest_so_far_size)
-        } else {
-            subdir_smallest_so_far_size
-        },
-    )
+    (total_size, make_result(total_size, subdir_result))
 }
 
 #[derive(Debug)]
