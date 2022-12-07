@@ -26,10 +26,8 @@ pub fn part1(input: String) -> u32 {
 
     // Build a tree, going up and down inodes and filling out file entries as
     // list output directs us.
-    let mut current_ptr = &root;
+    let mut current_ptr = root.clone();
     for command in &commands[1..] {
-        println!("{command:?}");
-
         match command {
             List(entries) => {
                 let mut current = current_ptr.borrow_mut();
@@ -39,37 +37,70 @@ pub fn part1(input: String) -> u32 {
                             current.files.insert(name, *size);
                         }
                         ListEntry::Directory { name } => {
-                            let child = Directory {
+                            let child = Rc::new(RefCell::new(Directory {
                                 parent: Some(current_ptr.clone()),
                                 files: HashMap::new(),
                                 dirs: HashMap::new(),
-                            };
-                            current.dirs.insert(name, Rc::new(RefCell::new(child)));
+                            }));
+                            current.dirs.insert(name, child);
                         }
                     }
                 }
             }
             ChangeDir(In { dir }) => {
-                let current = current_ptr.borrow();
-                let target = current.dirs.get(dir).unwrap_or_else(|| {
-                    println!("Impossible: navigated into non-existent directory");
-                    exit(1)
-                }).clone();
-                current_ptr = &target;
+                current_ptr = {
+                    let current = current_ptr.borrow();
+                    current
+                        .dirs
+                        .get(dir)
+                        .unwrap_or_else(|| {
+                            println!("Impossible: navigated into non-existent directory");
+                            exit(1)
+                        })
+                        .clone()
+                };
             }
             ChangeDir(Out) => {
-                // let parent = parents.pop().unwrap_or_else(|| {
-                //     println!("Impossible: navigated out of filesystem");
-                //     exit(1)
-                // });
-                // current = parent;
+                current_ptr = {
+                    let current = current_ptr.borrow();
+                    current
+                        .parent
+                        .as_ref()
+                        .unwrap_or_else(|| {
+                            println!("Impossible: navigated outside of filesystem");
+                            exit(1)
+                        })
+                        .clone()
+                }
             }
             ChangeDir(Root) => {
-                current_ptr = &root;
+                current_ptr = root.clone();
             }
         }
     }
-    todo!()
+
+    // Traverse the tree from the bottom up, computing total sizes.
+    let (_, count) = count_subdirs_by_size(&root.borrow());
+
+    count
+}
+
+type TotalSize = u32;
+
+type CountedSize = u32;
+
+fn count_subdirs_by_size(dir: &Directory) -> (TotalSize, CountedSize) {
+    let direct_size: u32 = dir.files.iter().map(|(_, size)| size).copied().sum();
+    let (subdir_total_size, subdir_counted_size) = dir
+        .dirs
+        .iter()
+        .map(|(_, subdir)| count_subdirs_by_size(&subdir.borrow()))
+        .fold((0, 0), |(a, b), (c, d)| (a + c, b + d));
+    let total_size = direct_size + subdir_total_size;
+    (
+        total_size,
+        if total_size <= 100_000 { total_size } else { 0 } + subdir_counted_size,
+    )
 }
 
 #[derive(Debug)]
@@ -83,7 +114,16 @@ struct Directory<'a> {
     // guarantee that we can construct all children before their parents,
     // because the terminal commands don't have a guaranteed traversal order.
     //
-    // Alternative implementations include a zipper or Vec/index-based nodes.
+    // Alternative implementations include:
+    //
+    // - Using a Zipper.
+    // - Using a Vec-backed tree implementation (each node has its own index,
+    //   and refers to other nodes by index).
+    // - Using a Map-backed tree implementation (each node is keyed by its
+    //   directory path, and refers to other nodes by path).
+    //
+    // We only use the parent pointer during the _construction_ of the tree -
+    // once constructed, should we throw it away somehow?
     parent: Option<Rc<RefCell<Directory<'a>>>>,
     files: HashMap<&'a str, u32>,
     dirs: HashMap<&'a str, Rc<RefCell<Directory<'a>>>>,
