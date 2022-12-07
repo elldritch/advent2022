@@ -2,9 +2,9 @@ use std::process::exit;
 
 use nom::IResult;
 
-pub fn must_parse<F, T>(parser: F, input: &str) -> T
+pub fn must_parse<'a, F, T>(parser: F, input: &'a str) -> T
 where
-    F: Fn(&str) -> IResult<&str, T>,
+    F: Fn(&'a str) -> IResult<&'a str, T>,
 {
     match parser(input) {
         Ok(("", pairs)) => pairs,
