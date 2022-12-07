@@ -1,5 +1,11 @@
 use std::{
-    cell::RefCell, cmp::min, collections::HashMap, ops::Add, process::exit, rc::Rc, u32::MAX,
+    cell::RefCell,
+    cmp::min,
+    collections::HashMap,
+    ops::Add,
+    process::exit,
+    rc::{Rc, Weak},
+    u32::MAX,
 };
 
 use nom::{
@@ -116,7 +122,7 @@ struct Directory<'a> {
     //
     // We only use the parent pointer during the _construction_ of the tree -
     // once constructed, should we throw it away somehow?
-    parent: Option<Rc<RefCell<Directory<'a>>>>,
+    parent: Option<Weak<RefCell<Directory<'a>>>>,
     files: HashMap<&'a str, u32>,
     dirs: HashMap<&'a str, Rc<RefCell<Directory<'a>>>>,
 }
@@ -171,7 +177,7 @@ fn build_filesystem(commands: Vec<Command>) -> Rc<RefCell<Directory>> {
                         }
                         ListEntry::Directory { name } => {
                             let child = Rc::new(RefCell::new(Directory {
-                                parent: Some(current_ptr.clone()),
+                                parent: Some(Rc::downgrade(&current_ptr)),
                                 files: HashMap::new(),
                                 dirs: HashMap::new(),
                             }));
@@ -196,14 +202,14 @@ fn build_filesystem(commands: Vec<Command>) -> Rc<RefCell<Directory>> {
             ChangeDir(Out) => {
                 current_ptr = {
                     let current = current_ptr.borrow();
-                    current
-                        .parent
-                        .as_ref()
-                        .unwrap_or_else(|| {
-                            println!("Impossible: navigated outside of filesystem");
-                            exit(1)
-                        })
-                        .clone()
+                    Weak::upgrade(current.parent.as_ref().unwrap_or_else(|| {
+                        println!("Impossible: navigated outside of filesystem");
+                        exit(1)
+                    }))
+                    .unwrap_or_else(|| {
+                        println!("Impossible: directory parent dropped before child");
+                        exit(1)
+                    })
                 }
             }
             ChangeDir(Root) => {
