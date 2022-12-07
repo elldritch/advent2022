@@ -98,8 +98,9 @@ where
 struct Directory<'a> {
     // We need the Rc because multiple children can have pointers to their
     // parents, and the RefCell because the parent needs interior mutation
-    // during construction while some of the children (who have already been
-    // constructed) hold a pointer to the parent.
+    // during construction in order to add more entries while some of the
+    // children (who have already been constructed) hold a pointer to the
+    // parent.
     //
     // If we interpret the puzzle's semantics strictly, there is no way to
     // guarantee that we can construct all children before their parents,
