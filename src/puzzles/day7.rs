@@ -80,11 +80,11 @@ where
     F: Fn(T, T) -> T + Copy,
     F2: Fn(TotalSize, T) -> T + Copy,
 {
-    let direct_size: u32 = dir.files.iter().map(|(_, size)| size).copied().sum();
+    let direct_size: u32 = dir.files.values().copied().sum();
     let (subdir_total_size, subdir_result) = dir
         .dirs
-        .iter()
-        .map(|(_, subdir)| {
+        .values()
+        .map(|subdir| {
             traverse_filesystem(
                 &subdir.borrow(),
                 combine_result_init,

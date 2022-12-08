@@ -117,8 +117,50 @@ fn trees_visible_along(
     visible
 }
 
-pub fn part2(input: String) -> u32 {
-    todo!()
+pub fn part2(input: String) -> usize {
+    // Parse input into grid.
+    let grid = parse_rectangular_grid(input.as_str());
+
+    // Find the tree with the largest scenic score.
+    grid.cells
+        .keys()
+        .map(|position| scenic_score(&grid, *position))
+        .max()
+        .unwrap_or_else(|| {
+            println!("Impossible: no tree had a maximum scenic score");
+            exit(1)
+        })
+}
+
+fn scenic_score(grid: &Grid, position: Position) -> usize {
+    let (x, y) = position;
+
+    let los_up = (0..y).map(|y2| (x, y2)).rev().collect::<Vec<Position>>();
+    let los_down = (y + 1..grid.height)
+        .map(|y2| (x, y2))
+        .collect::<Vec<Position>>();
+    let los_left = (0..x).map(|x2| (x2, y)).rev().collect::<Vec<Position>>();
+    let los_right = (x + 1..grid.width)
+        .map(|x2| (x2, y))
+        .collect::<Vec<Position>>();
+
+    vec![los_up, los_down, los_left, los_right]
+        .iter()
+        .map(|los| trees_viewable_along(grid, position, los))
+        .product()
+}
+
+fn trees_viewable_along(grid: &Grid, position: Position, line_of_sight: &Vec<Position>) -> usize {
+    let start_height = grid.cells.get(&position).unwrap_or_else(|| exit(1));
+    let mut visible_count = 0;
+    for position in line_of_sight {
+        let height = grid.cells.get(&position).unwrap_or_else(|| exit(1));
+        visible_count += 1;
+        if height >= start_height {
+            break;
+        }
+    }
+    visible_count
 }
 
 #[cfg(test)]
@@ -139,6 +181,6 @@ mod tests {
 
     #[test]
     fn test_part2() {
-        assert_eq!(part2(EXAMPLE_INPUT.into()), 0)
+        assert_eq!(part2(EXAMPLE_INPUT.into()), 8)
     }
 }
