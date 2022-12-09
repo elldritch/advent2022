@@ -41,9 +41,7 @@ pub fn part2(input: String) -> usize {
     let rope_len = 10;
     let mut rope: Vec<Position> = (0..rope_len).map(|_| (0, 0)).collect();
     for step in steps {
-        println!("Step: {step:?}");
         for _ in 0..step.distance {
-            println!("Rope start: {rope:?}");
             tails.insert(rope[rope_len - 1]);
             match step.direction {
                 Up => rope[0].1 += 1,
@@ -51,39 +49,34 @@ pub fn part2(input: String) -> usize {
                 Left => rope[0].0 -= 1,
                 Right => rope[0].0 += 1,
             }
-            println!("Rope H:     {rope:?}");
             for i in 1..rope_len {
                 rope[i] = follow(rope[i - 1], rope[i]);
-                println!("Rope {i:?}:     {rope:?}");
             }
-            println!();
         }
     }
     tails.insert(rope[rope_len - 1]);
     tails.len()
 }
 
-// Note that when the distance between a head and a tail is (2, 1), the tail
-// _always_ takes the diagonal step, never a step along either axis. This always
-// puts the tail in an axis-aligned new position behind the head along the long
-// axis of the distance.
-//
-// I think this is the same behavior as moving away along an axis, so we don't
-// actually have that many cases to account for.
 fn follow(head: Position, tail: Position) -> Position {
-    // TODO: handle the (2, 2) distance case, which can occur when three
-    // diagonals in a row.
-    if head.0 - tail.0 == 2 {
-        (head.0 - 1, head.1)
-    } else if head.0 - tail.0 == -2 {
-        (head.0 + 1, head.1)
-    } else if head.1 - tail.1 == 2 {
-        (head.0, head.1 - 1)
-    } else if head.1 - tail.1 == -2 {
-        (head.0, head.1 + 1)
-    } else if (head.0 - tail.0).abs() > 2 || (head.1 - tail.1).abs() > 2 {
-        println!("Impossible: head more than 2 away from tail: {head:?} {tail:?}");
-        exit(1)
+    // We only move when the head is at least 2 away in at least one axis.
+    if (head.0 - tail.0).abs() == 2 || (head.1 - tail.1).abs() == 2 {
+        // Diagonal cases.
+        if head.0 != tail.0 && head.1 != tail.1 {
+            (
+                tail.0 + (head.0 - tail.0).signum(),
+                tail.1 + (head.1 - tail.1).signum(),
+            )
+        } else if head.0 != tail.0 {
+            (tail.0 + (head.0 - tail.0).signum(), tail.1)
+        } else if head.1 != tail.1 {
+            (tail.0, tail.1 + (head.1 - tail.1).signum())
+        } else {
+            println!(
+                "Impossible: head has distance from tail but all elements equal: {head:?} {tail:?}"
+            );
+            exit(1)
+        }
     } else {
         tail
     }
