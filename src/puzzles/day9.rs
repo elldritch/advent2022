@@ -61,7 +61,7 @@ pub fn part2(input: String) -> usize {
 fn follow(head: Position, tail: Position) -> Position {
     // We only move when the head is at least 2 away in at least one axis.
     if (head.0 - tail.0).abs() == 2 || (head.1 - tail.1).abs() == 2 {
-        // Diagonal cases.
+        // Diagonal cases: distances of (2, 1) and (2, 2).
         if head.0 != tail.0 && head.1 != tail.1 {
             (
                 tail.0 + (head.0 - tail.0).signum(),
@@ -77,6 +77,9 @@ fn follow(head: Position, tail: Position) -> Position {
             );
             exit(1)
         }
+    } else if (head.0 - tail.0).abs() > 2 || (head.1 - tail.1).abs() > 2 {
+        println!("Impossible: head has distance from tail more than 2: {head:?} {tail:?}");
+        exit(1)
     } else {
         tail
     }
