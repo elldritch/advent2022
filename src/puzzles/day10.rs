@@ -10,9 +10,47 @@ use nom::{
 
 pub fn part1(input: String) -> i32 {
     let instructions = super::shared::must_parse(parse, input.as_str());
+    let states = run_program(instructions);
 
-    let mut state = CPU { cycle: 1, x: 1 };
-    let states = instructions
+    let signals_of_interest = states.iter().filter(|state| {
+        state.cycle == 20
+            || state.cycle == 60
+            || state.cycle == 100
+            || state.cycle == 140
+            || state.cycle == 180
+            || state.cycle == 220
+    });
+
+    signals_of_interest.map(|CPU { cycle, x }| cycle * x).sum()
+}
+
+pub fn part2(input: String) -> String {
+    let instructions = super::shared::must_parse(parse, input.as_str());
+    let states = run_program(instructions);
+
+    let mut message = String::new();
+    let mut sprite_position = 1;
+    for CPU { cycle, x } in states {
+        let pixel_position = (cycle - 1) % 40;
+
+        if cycle > 1 && pixel_position == 0 {
+            message.push('\n')
+        }
+        if pixel_position >= sprite_position - 1 && pixel_position <= sprite_position + 1 {
+            message.push('#')
+        } else {
+            message.push('.')
+        }
+
+        sprite_position = x;
+    }
+
+    message
+}
+
+fn run_program(instructions: Vec<Instruction>) -> Vec<CPU> {
+    let mut state = CPU { cycle: 0, x: 1 };
+    instructions
         .iter()
         .flat_map(|instruction| match instruction {
             NoOp => {
@@ -27,22 +65,8 @@ pub fn part1(input: String) -> i32 {
                 let c2_state = state.clone();
                 vec![c1_state, c2_state]
             }
-        });
-
-    let signals_of_interest = states.filter(|state| {
-        state.cycle == 20
-            || state.cycle == 60
-            || state.cycle == 100
-            || state.cycle == 140
-            || state.cycle == 180
-            || state.cycle == 220
-    });
-
-    signals_of_interest.map(|CPU { cycle, x }| cycle * x).sum()
-}
-
-pub fn part2(input: String) -> u32 {
-    todo!()
+        })
+        .collect()
 }
 
 #[derive(Debug, Clone)]
@@ -227,6 +251,14 @@ noop
 
     #[test]
     fn test_part2() {
-        assert_eq!(part2(EXAMPLE_INPUT.into()), 0)
+        assert_eq!(
+            part2(EXAMPLE_INPUT.into()),
+            "##..##..##..##..##..##..##..##..##..##..
+###...###...###...###...###...###...###.
+####....####....####....####....####....
+#####.....#####.....#####.....#####.....
+######......######......######......####
+#######.......#######.......#######....."
+        )
     }
 }
