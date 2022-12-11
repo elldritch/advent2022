@@ -12,14 +12,20 @@ pub fn part1(input: String) -> i32 {
     let instructions = super::shared::must_parse(parse, input.as_str());
     let states = run_program(instructions);
 
-    let signals_of_interest = states.iter().filter(|state| {
-        state.cycle == 20
-            || state.cycle == 60
-            || state.cycle == 100
-            || state.cycle == 140
-            || state.cycle == 180
-            || state.cycle == 220
-    });
+    let signals_of_interest = states
+        .iter()
+        .map(|state| CPU {
+            cycle: state.cycle + 1,
+            x: state.x,
+        })
+        .filter(|state| {
+            state.cycle == 20
+                || state.cycle == 60
+                || state.cycle == 100
+                || state.cycle == 140
+                || state.cycle == 180
+                || state.cycle == 220
+        });
 
     signals_of_interest.map(|CPU { cycle, x }| cycle * x).sum()
 }
