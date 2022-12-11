@@ -10,7 +10,7 @@ use itertools::Itertools;
 use nom::{
     branch::alt,
     bytes::complete::tag,
-    character::complete::{newline, u16},
+    character::complete::{newline, u32},
     combinator::map,
     multi::separated_list1,
     sequence::{delimited, preceded},
@@ -18,15 +18,43 @@ use nom::{
 };
 
 pub fn part1(input: String) -> usize {
-    let monkeys: Vec<Monkey<u16>> = super::shared::must_parse(parse, input.as_str());
-    simulate_monkey_business::<u16>(monkeys, 20, |x| x / 3)
+    let monkeys: Vec<Monkey<u32>> = super::shared::must_parse(parse, input.as_str());
+    simulate_monkey_business::<u32>(monkeys, 20, |x| x / 3)
 }
 
 pub fn part2(input: String) -> usize {
-    let moduli = [0; 9];
-    let monkeys: Vec<Monkey<u16>> = super::shared::must_parse(parse, input.as_str());
-    let monkeys2 = todo!();
-    simulate_monkey_business::<ResidueNumber>(monkeys2, 10000, |x| x)
+    let monkeys: Vec<Monkey<u32>> = super::shared::must_parse(parse, input.as_str());
+    let moduli: Vec<u32> = monkeys
+        .iter()
+        .map(|monkey| monkey.divisibility_test)
+        .collect();
+    let residue_monkeys = monkeys
+        .into_iter()
+        .map(
+            |Monkey {
+                 items,
+                 operation,
+                 divisibility_test,
+                 true_monkey,
+                 false_monkey,
+             }|
+             -> Monkey<ResidueNumber> {
+                let items = items
+                    .into_iter()
+                    .map(|worry_level| ResidueNumber::new(moduli.as_slice(), worry_level))
+                    .collect();
+                // Can't use update syntax yet :( https://github.com/rust-lang/rust/issues/86555
+                Monkey {
+                    items,
+                    operation,
+                    divisibility_test,
+                    true_monkey,
+                    false_monkey,
+                }
+            },
+        )
+        .collect();
+    simulate_monkey_business::<ResidueNumber>(residue_monkeys, 10000, |x| x)
 }
 
 fn simulate_monkey_business<T>(
@@ -35,10 +63,10 @@ fn simulate_monkey_business<T>(
     update_bored_worry: fn(T) -> T,
 ) -> usize
 where
-    T: Add<u16, Output = T>
-        + Mul<u16, Output = T>
+    T: Add<u32, Output = T>
+        + Mul<u32, Output = T>
         + Mul<T, Output = T>
-        + TryDivisibleBy<u16>
+        + TryDivisibleBy<u32>
         + Clone,
 {
     let monkeys_ptr = &mut monkeys as *mut Vec<Monkey<_>>;
@@ -101,14 +129,14 @@ where
 struct Monkey<T> {
     items: VecDeque<T>,
     operation: Operation,
-    divisibility_test: u16,
+    divisibility_test: u32,
     true_monkey: usize,
     false_monkey: usize,
 }
 
 enum Operation {
-    Add(u16),
-    Mul(u16),
+    Add(u32),
+    Mul(u32),
     Square,
 }
 
@@ -130,7 +158,7 @@ trait TryDivisibleBy<Rhs = Self> {
     fn divisible_by(self, rhs: Rhs) -> Option<bool>;
 }
 
-impl TryDivisibleBy for u16 {
+impl TryDivisibleBy for u32 {
     fn divisible_by(self, rhs: Self) -> Option<bool> {
         Some(self % rhs == 0)
     }
@@ -138,41 +166,47 @@ impl TryDivisibleBy for u16 {
 
 #[derive(Debug, Clone)]
 struct ResidueNumber {
-    // Moduli: 2, 3, 5, 7, 11, 13, 17, 19, 23
-    residues: [u32; RESIDUE_MODULI_LEN],
+    residues: HashMap<u32, u32>,
 }
 
-const RESIDUE_MODULI_LEN: usize = 9;
-const RESIDUE_MODULI: [u32; RESIDUE_MODULI_LEN] = [2, 3, 5, 7, 11, 13, 17, 19, 23];
-
 impl ResidueNumber {
-    fn new(x: u16) -> ResidueNumber {
+    fn new(moduli: &[u32], x: u32) -> ResidueNumber {
         let mut n = ResidueNumber {
-            residues: [x as u32; RESIDUE_MODULI_LEN],
+            residues: HashMap::new(),
         };
+        for modulus in moduli {
+            n.residues.insert(*modulus, x % modulus);
+        }
         modulate(&mut n);
         n
     }
 
-    fn from_moduli(moduli: &[u32], n: u16) -> ResidueNumber {
-        todo!()
-    }
-
-    fn make_from_moduli(moduli: &[u32]) -> impl Fn(u16) -> ResidueNumber + Clone {
-        |n| ResidueNumber { residues: [0; 9] }
+    fn moduli(&self) -> Vec<u32> {
+        self.residues.keys().copied().sorted().collect()
     }
 }
 
 fn modulate(n: &mut ResidueNumber) {
-    for i in 0..RESIDUE_MODULI_LEN {
-        n.residues[i] = n.residues[i] % RESIDUE_MODULI[i];
+    let moduli = n.moduli();
+    for modulus in moduli {
+        let v = n.residues.get(&modulus).unwrap();
+        n.residues.insert(modulus, v % modulus);
     }
 }
 
 fn binop(f: fn(u32, u32) -> u32, lhs: &ResidueNumber, rhs: &ResidueNumber) -> ResidueNumber {
-    let mut out = ResidueNumber::new(0);
-    for i in 0..RESIDUE_MODULI_LEN {
-        out.residues[i] = f(lhs.residues[i], rhs.residues[i]);
+    let moduli = lhs.moduli();
+    if moduli != rhs.moduli() {
+        panic!("cannot operate on residue numbers with different moduli");
+    }
+
+    let mut out = ResidueNumber::new(moduli.as_slice(), 0);
+    for modulus in moduli {
+        if let (Some(l), Some(r)) = (lhs.residues.get(&modulus), rhs.residues.get(&modulus)) {
+            out.residues.insert(modulus, f(*l, *r));
+        } else {
+            panic!("impossible: residue numbers with same moduli have inconsistent residue keys")
+        }
     }
     modulate(&mut out);
     out
@@ -186,11 +220,12 @@ impl Add for ResidueNumber {
     }
 }
 
-impl Add<u16> for ResidueNumber {
+impl Add<u32> for ResidueNumber {
     type Output = ResidueNumber;
 
-    fn add(self, rhs: u16) -> Self::Output {
-        todo!()
+    fn add(self, rhs: u32) -> Self::Output {
+        let moduli = self.moduli();
+        self.add(Self::new(moduli.as_slice(), rhs))
     }
 }
 
@@ -202,11 +237,12 @@ impl Mul for ResidueNumber {
     }
 }
 
-impl Mul<u16> for ResidueNumber {
+impl Mul<u32> for ResidueNumber {
     type Output = ResidueNumber;
 
-    fn mul(self, rhs: u16) -> Self::Output {
-        todo!()
+    fn mul(self, rhs: u32) -> Self::Output {
+        let moduli = self.moduli();
+        self.mul(Self::new(moduli.as_slice(), rhs))
     }
 }
 
@@ -222,26 +258,25 @@ impl PartialEq for ResidueNumber {
 // We could implement this for numbers in 0 <= n <= M where M is the product of
 // all moduli if the moduli are pairwise co-prime using the Chinese Remainder
 // Theorem.
-impl TryDivisibleBy<u16> for ResidueNumber {
-    fn divisible_by(self, rhs: u16) -> Option<bool> {
-        for (i, m) in RESIDUE_MODULI.into_iter().enumerate() {
-            if m as u16 == rhs {
-                return Some(self.residues[i] == 0);
-            }
+impl TryDivisibleBy<u32> for ResidueNumber {
+    fn divisible_by(self, rhs: u32) -> Option<bool> {
+        if let Some(n) = self.residues.get(&rhs) {
+            Some(*n == 0)
+        } else {
+            None
         }
-        None
     }
 }
 
-fn parse(input: &str) -> IResult<&str, Vec<Monkey<u16>>> {
+fn parse(input: &str) -> IResult<&str, Vec<Monkey<u32>>> {
     separated_list1(newline, parse_monkey)(input)
 }
 
-fn parse_monkey(input: &str) -> IResult<&str, Monkey<u16>> {
-    let (input, _) = delimited(tag("Monkey "), u16, tag(":\n"))(input)?;
+fn parse_monkey(input: &str) -> IResult<&str, Monkey<u32>> {
+    let (input, _) = delimited(tag("Monkey "), u32, tag(":\n"))(input)?;
     let (input, items) = delimited(
         tag("  Starting items: "),
-        map(separated_list1(tag(", "), u16), |xs| {
+        map(separated_list1(tag(", "), u32), |xs| {
             xs.into_iter().collect()
         }),
         newline,
@@ -249,17 +284,17 @@ fn parse_monkey(input: &str) -> IResult<&str, Monkey<u16>> {
     let (input, operation) = delimited(
         tag("  Operation: new = old "),
         alt((
-            map(preceded(tag("+ "), u16), |x: u16| Operation::Add(x)),
-            map(preceded(tag("* "), u16), |x: u16| Operation::Mul(x)),
+            map(preceded(tag("+ "), u32), |x: u32| Operation::Add(x)),
+            map(preceded(tag("* "), u32), |x: u32| Operation::Mul(x)),
             map(tag("* old"), |_| Operation::Square),
         )),
         newline,
     )(input)?;
-    let (input, divisibility_test) = delimited(tag("  Test: divisible by "), u16, newline)(input)?;
+    let (input, divisibility_test) = delimited(tag("  Test: divisible by "), u32, newline)(input)?;
     let (input, true_monkey) =
-        delimited(tag("    If true: throw to monkey "), u16, newline)(input)?;
+        delimited(tag("    If true: throw to monkey "), u32, newline)(input)?;
     let (input, false_monkey) =
-        delimited(tag("    If false: throw to monkey "), u16, newline)(input)?;
+        delimited(tag("    If false: throw to monkey "), u32, newline)(input)?;
 
     Ok((
         input,
