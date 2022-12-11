@@ -18,13 +18,36 @@ use nom::{
 };
 
 pub fn part1(input: String) -> usize {
-    let monkeys: Vec<Monkey<u16>> = super::shared::must_parse(parse, input.as_str());
+    let monkeys: Vec<Monkey<u16>> = must_parse(From::from, input.as_str());
     simulate_monkey_business::<u16>(monkeys, 20, |x| x / 3)
 }
 
 pub fn part2(input: String) -> usize {
-    let monkeys: Vec<Monkey<ResidueNumber>> = super::shared::must_parse(parse, input.as_str());
+    let moduli = [0; 9];
+    let monkeys: Vec<Monkey<ResidueNumber>> =
+        must_parse(ResidueNumber::make_from_moduli(&moduli), input.as_str());
     simulate_monkey_business::<ResidueNumber>(monkeys, 10000, |x| x)
+}
+
+fn must_parse<F, T>(parse_number: F, input: &str) -> Vec<Monkey<T>>
+where
+    T: Add<Output = T> + Mul<Output = T> + Clone,
+    F: Fn(u16) -> T + Clone + 'static,
+{
+    match parse(input, parse_number) {
+        Ok(("", pairs)) => pairs,
+        Ok((remaining, _)) => {
+            println!(
+                "Invalid puzzle input: could not parse input suffix: {}",
+                remaining
+            );
+            exit(1)
+        }
+        Err(err) => {
+            println!("Could not parse puzzle input: {}", err);
+            exit(1)
+        }
+    }
 }
 
 fn simulate_monkey_business<T>(
@@ -33,8 +56,7 @@ fn simulate_monkey_business<T>(
     update_worry: fn(T) -> T,
 ) -> usize
 where
-    T: DivisibleBy<u16> + Clone,
-    // T: DivisibleBy<T> + Clone,
+    T: TryDivisibleBy<u16> + Clone,
 {
     let monkeys_ptr = &mut monkeys as *mut Vec<Monkey<_>>;
 
@@ -50,7 +72,9 @@ where
             let op = &monkey.operation;
             while let Some(item) = monkey.items.pop_front() {
                 let new_worry_level = update_worry(op(item));
-                let target_monkey_index = if new_worry_level.divisible_by(monkey.divisibility_test)
+                let target_monkey_index = if let Some(true) = new_worry_level
+                    .clone()
+                    .divisible_by(monkey.divisibility_test)
                 {
                     monkey.true_monkey
                 } else {
@@ -110,13 +134,13 @@ where
     }
 }
 
-trait DivisibleBy<Rhs = Self> {
-    fn divisible_by(&self, rhs: Rhs) -> bool;
+trait TryDivisibleBy<Rhs = Self> {
+    fn divisible_by(self, rhs: Rhs) -> Option<bool>;
 }
 
-impl DivisibleBy for u16 {
-    fn divisible_by(&self, rhs: Self) -> bool {
-        self % rhs == 0
+impl TryDivisibleBy for u16 {
+    fn divisible_by(self, rhs: Self) -> Option<bool> {
+        Some(self % rhs == 0)
     }
 }
 
@@ -147,6 +171,14 @@ impl ResidueNumber {
         modulate(&mut n);
         n
     }
+
+    fn from_moduli(moduli: &[u32], n: u16) -> ResidueNumber {
+        todo!()
+    }
+
+    fn make_from_moduli(moduli: &[u32]) -> impl Fn(u16) -> ResidueNumber + Clone {
+        |n| ResidueNumber { residues: [0; 9] }
+    }
 }
 
 fn modulate(n: &mut ResidueNumber) {
@@ -162,24 +194,6 @@ fn binop(f: fn(u32, u32) -> u32, lhs: &ResidueNumber, rhs: &ResidueNumber) -> Re
     }
     modulate(&mut out);
     out
-}
-
-impl From<u16> for ResidueNumber {
-    fn from(x: u16) -> Self {
-        ResidueNumber::new(x)
-    }
-}
-
-impl Into<u32> for ResidueNumber {
-    fn into(self) -> u32 {
-        todo!()
-    }
-}
-
-impl Into<u32> for &ResidueNumber {
-    fn into(self) -> u32 {
-        todo!()
-    }
 }
 
 impl Add for ResidueNumber {
@@ -204,98 +218,84 @@ impl PartialEq for ResidueNumber {
     }
 }
 
-impl DivisibleBy for ResidueNumber {
-    fn divisible_by(&self, rhs: Self) -> bool {
-        // Fast path (and the only one we use in this problem): check if the
-        // divisor is a modulus.
-        for (i, m) in RESIDUE_MODULI.into_iter().enumerate() {
-            if ResidueNumber::new(m as u16) == rhs {
-                return self.residues[i] == 0;
-            }
-        }
-
-        // Note: this is unimplemented.
-        let x: u32 = self.into();
-        let y: u32 = rhs.into();
-        x % y == 0
-    }
-}
-
-impl DivisibleBy<u16> for ResidueNumber {
-    fn divisible_by(&self, rhs: u16) -> bool {
-        // Fast path (and the only one we use in this problem): check if the
-        // divisor is a modulus.
+// Residue numbers can only be tested for divisibility against one of their
+// moduli.
+//
+// We could implement this for numbers in 0 <= n <= M where M is the product of
+// all moduli if the moduli are pairwise co-prime using the Chinese Remainder
+// Theorem.
+impl TryDivisibleBy<u16> for ResidueNumber {
+    fn divisible_by(self, rhs: u16) -> Option<bool> {
         for (i, m) in RESIDUE_MODULI.into_iter().enumerate() {
             if m as u16 == rhs {
-                return self.residues[i] == 0;
+                return Some(self.residues[i] == 0);
             }
         }
-
-        // Note: this is unimplemented.
-        let x: u32 = self.into();
-        let y: u32 = rhs.into();
-        x % y == 0
+        None
     }
 }
 
-fn parse<T>(input: &str) -> IResult<&str, Vec<Monkey<T>>>
+fn parse<T, F>(input: &str, parse_number: F) -> IResult<&str, Vec<Monkey<T>>>
 where
-    T: From<u16> + Add<Output = T> + Mul<Output = T> + Clone,
+    T: Add<Output = T> + Mul<Output = T> + Clone,
+    F: Fn(u16) -> T + Clone + 'static,
 {
-    separated_list1(newline, parse_monkey)(input)
+    separated_list1(newline, parse_monkey(parse_number))(input)
 }
 
-fn parse_monkey<T>(input: &str) -> IResult<&str, Monkey<T>>
+fn parse_monkey<T, F>(parse_number: F) -> impl Fn(&str) -> IResult<&str, Monkey<T>>
 where
-    T: From<u16> + Add<Output = T> + Mul<Output = T> + Clone,
+    T: Add<Output = T> + Mul<Output = T> + Clone,
+    F: Fn(u16) -> T + Clone + 'static,
 {
-    let (input, _) = delimited(tag("Monkey "), u16, tag(":\n"))(input)?;
-    let (input, items) = delimited(
-        tag("  Starting items: "),
-        map(separated_list1(tag(", "), u16), |xs| {
-            xs.into_iter().map(T::from).collect()
-        }),
-        newline,
-    )(input)?;
-    let (input, operation) = delimited(
-        tag("  Operation: new = old "),
-        alt((
-            map(preceded(tag("* "), u16), |x: u16| {
-                Box::new(move |old: T| old * T::from(x)) as Box<dyn Fn(T) -> T>
+    move |input| {
+        let (input, _) = delimited(tag("Monkey "), u16, tag(":\n"))(input)?;
+        let (input, items) = delimited(
+            tag("  Starting items: "),
+            map(separated_list1(tag(", "), u16), |xs| {
+                let f = parse_number.clone();
+                xs.into_iter().map(f).collect()
             }),
-            map(preceded(tag("+ "), u16), |x: u16| {
-                Box::new(move |old: T| old + T::from(x)) as Box<dyn Fn(T) -> T>
-            }),
-            map(tag("* old"), |_| {
-                Box::new(|old: T| {
-                    let old_clone = old.clone();
-                    old * old_clone
-                }) as Box<dyn Fn(T) -> T>
-            }),
-        )),
-        newline,
-    )(input)?;
-    let (input, divisibility_test) = delimited(
-        tag("  Test: divisible by "),
-        // map(u16, |x| T::from(x)),
-        u16,
-        newline,
-    )(input)?;
-    let (input, true_monkey) =
-        delimited(tag("    If true: throw to monkey "), u16, newline)(input)?;
-    let (input, false_monkey) =
-        delimited(tag("    If false: throw to monkey "), u16, newline)(input)?;
+            newline,
+        )(input)?;
+        let (input, operation) = delimited(
+            tag("  Operation: new = old "),
+            alt((
+                map(preceded(tag("* "), u16), |x: u16| {
+                    let f = parse_number.clone();
+                    Box::new(move |old: T| old * f(x)) as Box<dyn Fn(T) -> T>
+                }),
+                map(preceded(tag("+ "), u16), |x: u16| {
+                    let f = parse_number.clone();
+                    Box::new(move |old: T| old + f(x)) as Box<dyn Fn(T) -> T>
+                }),
+                map(tag("* old"), |_| {
+                    Box::new(|old: T| {
+                        let old_clone = old.clone();
+                        old * old_clone
+                    }) as Box<dyn Fn(T) -> T>
+                }),
+            )),
+            newline,
+        )(input)?;
+        let (input, divisibility_test) =
+            delimited(tag("  Test: divisible by "), u16, newline)(input)?;
+        let (input, true_monkey) =
+            delimited(tag("    If true: throw to monkey "), u16, newline)(input)?;
+        let (input, false_monkey) =
+            delimited(tag("    If false: throw to monkey "), u16, newline)(input)?;
 
-    Ok((
-        input,
-        Monkey {
-            items,
-            operation,
-            divisibility_test,
-            true_monkey: true_monkey as usize,
-            false_monkey: false_monkey as usize,
-        },
-    ))
+        Ok((
+            input,
+            Monkey {
+                items,
+                operation,
+                divisibility_test,
+                true_monkey: true_monkey as usize,
+                false_monkey: false_monkey as usize,
+            },
+        ))
+    }
 }
 
 #[cfg(test)]
