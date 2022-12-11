@@ -80,7 +80,7 @@ where
     F: Fn(T, T) -> T + Copy,
     F2: Fn(TotalSize, T) -> T + Copy,
 {
-    let direct_size: u32 = dir.files.values().copied().sum();
+    let direct_size: u32 = dir.files.values().sum();
     let (subdir_total_size, subdir_result) = dir
         .dirs
         .values()
