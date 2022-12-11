@@ -18,45 +18,28 @@ use nom::{
 };
 
 pub fn part1(input: String) -> usize {
-    let monkeys: Vec<Monkey<u16>> = must_parse(From::from, input.as_str());
+    let monkeys: Vec<Monkey<u16>> = super::shared::must_parse(parse, input.as_str());
     simulate_monkey_business::<u16>(monkeys, 20, |x| x / 3)
 }
 
 pub fn part2(input: String) -> usize {
     let moduli = [0; 9];
-    let monkeys: Vec<Monkey<ResidueNumber>> =
-        must_parse(ResidueNumber::make_from_moduli(&moduli), input.as_str());
-    simulate_monkey_business::<ResidueNumber>(monkeys, 10000, |x| x)
-}
-
-fn must_parse<F, T>(parse_number: F, input: &str) -> Vec<Monkey<T>>
-where
-    T: Add<Output = T> + Mul<Output = T> + Clone,
-    F: Fn(u16) -> T + Clone + 'static,
-{
-    match parse(input, parse_number) {
-        Ok(("", pairs)) => pairs,
-        Ok((remaining, _)) => {
-            println!(
-                "Invalid puzzle input: could not parse input suffix: {}",
-                remaining
-            );
-            exit(1)
-        }
-        Err(err) => {
-            println!("Could not parse puzzle input: {}", err);
-            exit(1)
-        }
-    }
+    let monkeys: Vec<Monkey<u16>> = super::shared::must_parse(parse, input.as_str());
+    let monkeys2 = todo!();
+    simulate_monkey_business::<ResidueNumber>(monkeys2, 10000, |x| x)
 }
 
 fn simulate_monkey_business<T>(
     mut monkeys: Vec<Monkey<T>>,
     rounds: usize,
-    update_worry: fn(T) -> T,
+    update_bored_worry: fn(T) -> T,
 ) -> usize
 where
-    T: TryDivisibleBy<u16> + Clone,
+    T: Add<u16, Output = T>
+        + Mul<u16, Output = T>
+        + Mul<T, Output = T>
+        + TryDivisibleBy<u16>
+        + Clone,
 {
     let monkeys_ptr = &mut monkeys as *mut Vec<Monkey<_>>;
 
@@ -69,12 +52,15 @@ where
     // Simulate rounds.
     for _ in 0..rounds {
         for (monkey_id, monkey) in monkeys.iter_mut().enumerate() {
-            let op = &monkey.operation;
             while let Some(item) = monkey.items.pop_front() {
-                let new_worry_level = update_worry(op(item));
-                let target_monkey_index = if let Some(true) = new_worry_level
-                    .clone()
-                    .divisible_by(monkey.divisibility_test)
+                let inspection_worry = match monkey.operation {
+                    Operation::Add(x) => item + x,
+                    Operation::Mul(x) => item * x,
+                    Operation::Square => item.clone() * item,
+                };
+                let bored_worry = update_bored_worry(inspection_worry);
+                let target_monkey_index = if let Some(true) =
+                    bored_worry.clone().divisible_by(monkey.divisibility_test)
                 {
                     monkey.true_monkey
                 } else {
@@ -98,7 +84,7 @@ where
                 unsafe {
                     let monkeys_unsafe = &mut *monkeys_ptr;
                     let target_monkey = &mut monkeys_unsafe[target_monkey_index];
-                    target_monkey.items.push_back(new_worry_level);
+                    target_monkey.items.push_back(bored_worry);
                 }
             }
         }
@@ -114,10 +100,16 @@ where
 
 struct Monkey<T> {
     items: VecDeque<T>,
-    operation: Box<dyn Fn(T) -> T>,
+    operation: Operation,
     divisibility_test: u16,
     true_monkey: usize,
     false_monkey: usize,
+}
+
+enum Operation {
+    Add(u16),
+    Mul(u16),
+    Square,
 }
 
 impl<T> Debug for Monkey<T>
@@ -144,16 +136,6 @@ impl TryDivisibleBy for u16 {
     }
 }
 
-// This residue number is hard-coded to the moduli in my puzzle input.
-//
-// TODO: Is there a way to construct this type so that we can pick moduli at
-// runtime, based on the input? We could store the moduli as a HashMap. But how
-// would we implement From<u16>? The type signature doesn't let us pass in
-// moduli, and I don't think we can reify a term list out of a type parameter
-// because Rust has no Proxy-like mechanism.
-//
-// Maybe instead of using From<u16> we should pass in the `u16 -> T` function as
-// a parameter, just using From to provide the implementation where convenient.
 #[derive(Debug, Clone)]
 struct ResidueNumber {
     // Moduli: 2, 3, 5, 7, 11, 13, 17, 19, 23
@@ -204,11 +186,27 @@ impl Add for ResidueNumber {
     }
 }
 
+impl Add<u16> for ResidueNumber {
+    type Output = ResidueNumber;
+
+    fn add(self, rhs: u16) -> Self::Output {
+        todo!()
+    }
+}
+
 impl Mul for ResidueNumber {
     type Output = ResidueNumber;
 
     fn mul(self, rhs: Self) -> Self::Output {
         binop(Mul::mul, &self, &rhs)
+    }
+}
+
+impl Mul<u16> for ResidueNumber {
+    type Output = ResidueNumber;
+
+    fn mul(self, rhs: u16) -> Self::Output {
+        todo!()
     }
 }
 
@@ -235,67 +233,44 @@ impl TryDivisibleBy<u16> for ResidueNumber {
     }
 }
 
-fn parse<T, F>(input: &str, parse_number: F) -> IResult<&str, Vec<Monkey<T>>>
-where
-    T: Add<Output = T> + Mul<Output = T> + Clone,
-    F: Fn(u16) -> T + Clone + 'static,
-{
-    separated_list1(newline, parse_monkey(parse_number))(input)
+fn parse(input: &str) -> IResult<&str, Vec<Monkey<u16>>> {
+    separated_list1(newline, parse_monkey)(input)
 }
 
-fn parse_monkey<T, F>(parse_number: F) -> impl Fn(&str) -> IResult<&str, Monkey<T>>
-where
-    T: Add<Output = T> + Mul<Output = T> + Clone,
-    F: Fn(u16) -> T + Clone + 'static,
-{
-    move |input| {
-        let (input, _) = delimited(tag("Monkey "), u16, tag(":\n"))(input)?;
-        let (input, items) = delimited(
-            tag("  Starting items: "),
-            map(separated_list1(tag(", "), u16), |xs| {
-                let f = parse_number.clone();
-                xs.into_iter().map(f).collect()
-            }),
-            newline,
-        )(input)?;
-        let (input, operation) = delimited(
-            tag("  Operation: new = old "),
-            alt((
-                map(preceded(tag("* "), u16), |x: u16| {
-                    let f = parse_number.clone();
-                    Box::new(move |old: T| old * f(x)) as Box<dyn Fn(T) -> T>
-                }),
-                map(preceded(tag("+ "), u16), |x: u16| {
-                    let f = parse_number.clone();
-                    Box::new(move |old: T| old + f(x)) as Box<dyn Fn(T) -> T>
-                }),
-                map(tag("* old"), |_| {
-                    Box::new(|old: T| {
-                        let old_clone = old.clone();
-                        old * old_clone
-                    }) as Box<dyn Fn(T) -> T>
-                }),
-            )),
-            newline,
-        )(input)?;
-        let (input, divisibility_test) =
-            delimited(tag("  Test: divisible by "), u16, newline)(input)?;
-        let (input, true_monkey) =
-            delimited(tag("    If true: throw to monkey "), u16, newline)(input)?;
-        let (input, false_monkey) =
-            delimited(tag("    If false: throw to monkey "), u16, newline)(input)?;
+fn parse_monkey(input: &str) -> IResult<&str, Monkey<u16>> {
+    let (input, _) = delimited(tag("Monkey "), u16, tag(":\n"))(input)?;
+    let (input, items) = delimited(
+        tag("  Starting items: "),
+        map(separated_list1(tag(", "), u16), |xs| {
+            xs.into_iter().collect()
+        }),
+        newline,
+    )(input)?;
+    let (input, operation) = delimited(
+        tag("  Operation: new = old "),
+        alt((
+            map(preceded(tag("+ "), u16), |x: u16| Operation::Add(x)),
+            map(preceded(tag("* "), u16), |x: u16| Operation::Mul(x)),
+            map(tag("* old"), |_| Operation::Square),
+        )),
+        newline,
+    )(input)?;
+    let (input, divisibility_test) = delimited(tag("  Test: divisible by "), u16, newline)(input)?;
+    let (input, true_monkey) =
+        delimited(tag("    If true: throw to monkey "), u16, newline)(input)?;
+    let (input, false_monkey) =
+        delimited(tag("    If false: throw to monkey "), u16, newline)(input)?;
 
-        Ok((
-            input,
-            Monkey {
-                items,
-                operation,
-                divisibility_test,
-                true_monkey: true_monkey as usize,
-                false_monkey: false_monkey as usize,
-            },
-        ))
-    }
+    Ok((
+        input,
+        Monkey {
+            items,
+            operation,
+            divisibility_test,
+            true_monkey: true_monkey as usize,
+            false_monkey: false_monkey as usize,
+        },
+    ))
 }
 
 #[cfg(test)]
