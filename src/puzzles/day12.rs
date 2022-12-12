@@ -3,7 +3,7 @@ use std::{collections::HashMap, process::exit};
 use petgraph::{algo::dijkstra, prelude::DiGraphMap};
 
 pub fn part1(input: String) -> u32 {
-    let (start, goal, graph) = parse(input.as_str());
+    let (start, goal, _, graph) = parse(input.as_str());
     let paths = dijkstra(&graph, start, Some(goal), |_| 1);
     *paths.get(&goal).unwrap_or_else(|| {
         println!("Impossible: no path from start to goal");
@@ -11,19 +11,41 @@ pub fn part1(input: String) -> u32 {
     })
 }
 
-pub fn part2(_input: String) -> u32 {
-    todo!()
+pub fn part2(input: String) -> u32 {
+    // Take the original edges, and reverse all of them.
+    let (_, goal, heights, graph) = parse(input.as_str());
+    let reverse_graph = DiGraphMap::from_edges(graph.all_edges().map(|(a, b, ())| (b, a, ())));
+
+    // Find the shortest path to any trail starting point.
+    let paths = dijkstra(&reverse_graph, goal, None, |_| 1);
+    heights
+        .into_iter()
+        .filter(|(_, height)| *height == 1)
+        .filter_map(|(position, _)| paths.get(&position))
+        .copied()
+        .min()
+        .unwrap_or_else(|| {
+            println!("Impossible: no paths from hilltop to hiking trail starts");
+            exit(1)
+        })
 }
 
 type Position = (i32, i32);
 
 type Height = u32;
 
-fn parse(input: &str) -> (Position, Position, DiGraphMap<Position, ()>) {
+fn parse(
+    input: &str,
+) -> (
+    Position,
+    Position,
+    HashMap<Position, Height>,
+    DiGraphMap<Position, ()>,
+) {
     // First, we parse to a Map<Position, Height>. The origin is at the top
     // left, with the positive x direction being rightwards and the positive y
     // direction being downwards.
-    let mut heights: HashMap<Position, Height> = HashMap::new();
+    let mut heights = HashMap::new();
     let mut start = None;
     let mut goal = None;
     for (y, line) in input.lines().enumerate() {
@@ -75,6 +97,7 @@ fn parse(input: &str) -> (Position, Position, DiGraphMap<Position, ()>) {
                 exit(1)
             }
         },
+        heights,
         graph,
     )
 }
@@ -97,6 +120,6 @@ abdefghi
 
     #[test]
     fn test_part2() {
-        assert_eq!(part2(EXAMPLE_INPUT.into()), 0)
+        assert_eq!(part2(EXAMPLE_INPUT.into()), 29)
     }
 }
