@@ -22,8 +22,24 @@ pub fn part1(input: String) -> usize {
     simulate_monkey_business::<u32>(monkeys, 20, |x| x / 3)
 }
 
+// The trick for part 2 is to use modular arithmetic.
+//
+// We don't care about what the actual item's worry levels are. We only care
+// about whether the worry level is divisible by a particular monkey's
+// divisibility test, because that informs which next monkey will take the item,
+// and we care about how many times a monkey has an item.
+//
+// We take advantage of this by doing all of our arithmetic using _residue
+// numbers_, where we track the residue (remainder) of all operations modulo a
+// set of moduli (in our case, the monkey divisibility test numbers). Since we
+// only care about divisibility, and divisibility is preserved in modular
+// arithmetic with addition and multiplication, this is a safe optimization.
 pub fn part2(input: String) -> usize {
     let monkeys: Vec<Monkey<u32>> = super::shared::must_parse(parse, input.as_str());
+
+    // Build the list of moduli using all the divisibility tests from the
+    // monkeys. These are all the numbers we'll ever care about divisibility
+    // for, so they're the only ones we need to track residues for.
     let moduli: Vec<u32> = monkeys
         .iter()
         .map(|monkey| monkey.divisibility_test)
@@ -54,6 +70,7 @@ pub fn part2(input: String) -> usize {
             },
         )
         .collect();
+
     simulate_monkey_business::<ResidueNumber>(residue_monkeys, 10000, |x| x)
 }
 
@@ -87,12 +104,17 @@ where
                     Operation::Square => item.clone() * item,
                 };
                 let bored_worry = update_bored_worry(inspection_worry);
-                let target_monkey_index = if let Some(true) =
+                let target_monkey_index = if let Some(divisible) =
                     bored_worry.clone().divisible_by(monkey.divisibility_test)
                 {
-                    monkey.true_monkey
+                    if divisible {
+                        monkey.true_monkey
+                    } else {
+                        monkey.false_monkey
+                    }
                 } else {
-                    monkey.false_monkey
+                    println!("Impossible: tried to test divisibility against unsupported modulus");
+                    exit(1)
                 };
                 match monkey_inspection_counts.get(&monkey_id) {
                     Some(count) => {
@@ -126,6 +148,7 @@ where
         .product()
 }
 
+#[derive(Debug)]
 struct Monkey<T> {
     items: VecDeque<T>,
     operation: Operation,
@@ -134,26 +157,15 @@ struct Monkey<T> {
     false_monkey: usize,
 }
 
+#[derive(Debug)]
 enum Operation {
     Add(u32),
     Mul(u32),
     Square,
 }
 
-impl<T> Debug for Monkey<T>
-where
-    T: Debug,
-{
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("Monkey")
-            .field("items", &self.items)
-            .field("divisibility_test", &self.divisibility_test)
-            .field("true_monkey", &self.true_monkey)
-            .field("false_monkey", &self.false_monkey)
-            .finish()
-    }
-}
-
+// TryDivisibleBy tests divisibility against a divisor, returning the result if
+// the divisor is supported.
 trait TryDivisibleBy<Rhs = Self> {
     fn divisible_by(self, rhs: Rhs) -> Option<bool>;
 }
@@ -189,7 +201,10 @@ impl ResidueNumber {
 fn modulate(n: &mut ResidueNumber) {
     let moduli = n.moduli();
     for modulus in moduli {
-        let v = n.residues.get(&modulus).unwrap();
+        let v = n
+            .residues
+            .get(&modulus)
+            .unwrap_or_else(|| panic!("impossible: modulus not within residue map"));
         n.residues.insert(modulus, v % modulus);
     }
 }
@@ -248,6 +263,8 @@ impl Mul<u32> for ResidueNumber {
 
 impl PartialEq for ResidueNumber {
     fn eq(&self, other: &Self) -> bool {
+        // Note that this works because residues are already modulated as an
+        // invariant.
         self.residues == other.residues
     }
 }
