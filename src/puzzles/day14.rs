@@ -20,21 +20,6 @@ pub fn part1(input: String) -> u32 {
     // Parse the cave.
     let mut cave = super::shared::must_parse(parse, input.as_str());
 
-    // Simulate sand falls until fixpoint.
-    let mut sands = 0;
-    while let Some(new_sand) = add_sand(&cave) {
-        cave.insert(new_sand, Sand);
-        sands += 1;
-    }
-
-    sands
-}
-
-pub fn part2(_input: String) -> u32 {
-    todo!()
-}
-
-fn add_sand(cave: &Cave) -> Option<Position> {
     // Calculate abyss boundary. If the sand goes past the lowest rock
     // level, it falls into the abyss.
     let abyss_y = cave
@@ -47,12 +32,55 @@ fn add_sand(cave: &Cave) -> Option<Position> {
             exit(1)
         });
 
+    // Simulate sand falls until the first sand falls past the abyss, after
+    // which all sands must take that deterministic path into the abyss.
+    let mut sands = 0;
+    while let Some(new_sand) = add_sand_bottomless(&cave, abyss_y) {
+        cave.insert(new_sand, Sand);
+        sands += 1;
+    }
+
+    sands
+}
+
+// TODO: We could probably refactor part 1 and part 2 to be very similar. The
+// main difference is in how the lower boundary is treated. In both cases, the
+// rest of the implementation is the same, including the stop condition (which
+// in both parts can be re-expressed as the fix-point of the sand falling).
+pub fn part2(input: String) -> u32 {
+    // Parse the cave.
+    let mut cave = super::shared::must_parse(parse, input.as_str());
+
+    // Calculate the floor level boundary.
+    let floor = cave
+        .iter()
+        .filter(|(_, tile)| **tile == Rock)
+        .max_by_key(|((_, y), _)| *y)
+        .map(|((_, y), _)| *y)
+        .unwrap_or_else(|| {
+            println!("Invalid: cave had no rocks");
+            exit(1)
+        })
+        + 2;
+
+    // Simulate sand falls until the source is blocked.
+    let mut sands = 0;
+    while let None = cave.get(&SAND_SOURCE) {
+        let new_sand = add_sand_floored(&cave, floor);
+        cave.insert(new_sand, Sand);
+        sands += 1;
+    }
+
+    sands
+}
+
+fn add_sand_bottomless(cave: &Cave, abyss_y: u32) -> Option<Position> {
     // Take steps until the sand settles. If the sand goes past the lowest rock
     // level, it falls into the abyss.
     let mut sand_position = SAND_SOURCE;
     loop {
         let (x, y) = sand_position;
-        if y > abyss_y {
+        if y == abyss_y {
             return None;
         } else if let None = cave.get(&(x, y + 1)) {
             sand_position = (x, y + 1)
@@ -62,6 +90,26 @@ fn add_sand(cave: &Cave) -> Option<Position> {
             sand_position = (x + 1, y + 1)
         } else {
             return Some(sand_position);
+        }
+    }
+}
+
+fn add_sand_floored(cave: &Cave, floor: u32) -> Position {
+    // Take steps until the sand settles. If the sand goes past the lowest rock
+    // level, it falls into the abyss.
+    let mut sand_position = SAND_SOURCE;
+    loop {
+        let (x, y) = sand_position;
+        if y == floor - 1 {
+            return sand_position;
+        } else if let None = cave.get(&(x, y + 1)) {
+            sand_position = (x, y + 1)
+        } else if let None = cave.get(&(x - 1, y + 1)) {
+            sand_position = (x - 1, y + 1)
+        } else if let None = cave.get(&(x + 1, y + 1)) {
+            sand_position = (x + 1, y + 1)
+        } else {
+            return sand_position;
         }
     }
 }
@@ -166,6 +214,6 @@ mod tests {
 
     #[test]
     fn test_part2() {
-        assert_eq!(part2(EXAMPLE_INPUT.into()), 0)
+        assert_eq!(part2(EXAMPLE_INPUT.into()), 93)
     }
 }
