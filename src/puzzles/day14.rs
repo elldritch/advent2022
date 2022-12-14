@@ -1,7 +1,7 @@
 use std::{
     cmp::{max, min},
     collections::HashMap,
-    ops::{Range, RangeInclusive},
+    ops::RangeInclusive,
     process::exit,
     u32::{MAX, MIN},
 };
@@ -18,19 +18,52 @@ const SAND_SOURCE: Position = (500, 0);
 
 pub fn part1(input: String) -> u32 {
     // Parse the cave.
-    let cave = super::shared::must_parse(parse, input.as_str());
-    println!("{}", print_cave(cave));
-
-    // Sand falls into the abyss if it falls lower than the lowest level of
-    // rock.
+    let mut cave = super::shared::must_parse(parse, input.as_str());
 
     // Simulate sand falls until fixpoint.
+    let mut sands = 0;
+    while let Some(new_sand) = add_sand(&cave) {
+        cave.insert(new_sand, Sand);
+        sands += 1;
+    }
 
-    todo!()
+    sands
 }
 
 pub fn part2(_input: String) -> u32 {
     todo!()
+}
+
+fn add_sand(cave: &Cave) -> Option<Position> {
+    // Calculate abyss boundary. If the sand goes past the lowest rock
+    // level, it falls into the abyss.
+    let abyss_y = cave
+        .iter()
+        .filter(|(_, tile)| **tile == Rock)
+        .max_by_key(|((_, y), _)| *y)
+        .map(|((_, y), _)| *y)
+        .unwrap_or_else(|| {
+            println!("Invalid: cave had no rocks");
+            exit(1)
+        });
+
+    // Take steps until the sand settles. If the sand goes past the lowest rock
+    // level, it falls into the abyss.
+    let mut sand_position = SAND_SOURCE;
+    loop {
+        let (x, y) = sand_position;
+        if y > abyss_y {
+            return None;
+        } else if let None = cave.get(&(x, y + 1)) {
+            sand_position = (x, y + 1)
+        } else if let None = cave.get(&(x - 1, y + 1)) {
+            sand_position = (x - 1, y + 1)
+        } else if let None = cave.get(&(x + 1, y + 1)) {
+            sand_position = (x + 1, y + 1)
+        } else {
+            return Some(sand_position);
+        }
+    }
 }
 
 // Positive directions are (rightwards, downwards).
@@ -44,17 +77,11 @@ type Cave = HashMap<Position, Tile>;
 enum Tile {
     Rock,
     Sand,
-    Air,
 }
 use Tile::*;
 
-fn print_cave(cave: Cave) -> String {
-    let occupied_positions: Vec<Position> = cave
-        .clone()
-        .into_iter()
-        .filter(|(_, occupied)| *occupied != Air)
-        .map(|(pos, _)| pos)
-        .collect();
+fn print_cave(cave: &Cave) -> String {
+    let occupied_positions: Vec<Position> = cave.clone().into_iter().map(|(pos, _)| pos).collect();
 
     let (min_x, max_x, max_y) = {
         let mut min_x = MAX;
@@ -79,7 +106,6 @@ fn print_cave(cave: Cave) -> String {
                 rendered.push(match cave.get(&(x, y)) {
                     Some(Rock) => '#',
                     Some(Sand) => 'o',
-                    Some(Air) => '.',
                     None => '.',
                 });
             }
