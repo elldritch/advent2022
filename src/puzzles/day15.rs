@@ -1,4 +1,4 @@
-use std::collections::HashSet;
+use std::{collections::HashSet, process::exit};
 
 use nom::{
     bytes::complete::tag,
@@ -16,8 +16,7 @@ pub fn part1(input: String) -> usize {
 fn part1_solve(target_row: i32, input: &str) -> usize {
     let sensors = super::shared::must_parse(parse, input);
 
-    // For each sensor, compute its beaconless range, then filter by the target
-    // row.
+    // For each sensor, compute excluded positions for the target row.
     sensors
         .into_iter()
         .flat_map(
@@ -37,8 +36,40 @@ fn part1_solve(target_row: i32, input: &str) -> usize {
         .len()
 }
 
-pub fn part2(_input: String) -> u32 {
-    todo!()
+pub fn part2(input: String) -> i32 {
+    part2_solve(4_000_000, input.as_str())
+}
+
+fn part2_solve(search_area: i32, input: &str) -> i32 {
+    let sensors = super::shared::must_parse(parse, input);
+
+    // For each sensor, compute its excluded positions.
+    let excluded = sensors
+        .into_iter()
+        .flat_map(
+            |Sensor {
+                 position,
+                 closest_beacon,
+             }| {
+                let distance = manhattan(position, closest_beacon);
+                (position.0 - distance..=position.0 + distance)
+                    .flat_map(move |x| {
+                        (position.1 - distance..=position.1 + distance).map(move |y| (x, y))
+                    })
+                    .filter(move |candidate| manhattan(position, *candidate) <= distance)
+            },
+        )
+        .collect::<HashSet<_>>();
+
+    for x in 0..=search_area {
+        for y in 0..=search_area {
+            if !excluded.contains(&(x, y)) {
+                return x * 4_000_000 + y;
+            }
+        }
+    }
+    println!("Impossible: no valid solutions detected");
+    exit(1)
 }
 
 fn manhattan(a: Position, b: Position) -> i32 {
@@ -102,6 +133,6 @@ Sensor at x=20, y=1: closest beacon is at x=15, y=3
 
     #[test]
     fn test_part2() {
-        assert_eq!(part2(EXAMPLE_INPUT.into()), 0)
+        assert_eq!(part2_solve(20, EXAMPLE_INPUT.into()), 56000011)
     }
 }
