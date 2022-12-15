@@ -45,6 +45,7 @@ fn main() {
         12 => run_day(puzzles::day12::part1, puzzles::day12::part2, args, input),
         13 => run_day(puzzles::day13::part1, puzzles::day13::part2, args, input),
         14 => run_day(puzzles::day14::part1, puzzles::day14::part2, args, input),
+        15 => run_day(puzzles::day15::part1, puzzles::day15::part2, args, input),
         _ => println!("Unknown puzzle day: {}", args.day),
     }
 }
