@@ -27,15 +27,12 @@ fn part1_solve(target_row: i32, input: &str) -> usize {
              }| {
                 let distance = manhattan(position, closest_beacon);
                 (position.0 - distance..=position.0 + distance)
-                    .flat_map(move |x| {
-                        (position.1 - distance..=position.1 + distance).map(move |y| (x, y))
-                    })
+                    .map(move |x| (x, target_row))
                     .filter(move |candidate| {
                         manhattan(position, *candidate) <= distance && *candidate != closest_beacon
                     })
             },
         )
-        .filter(|(_, y)| *y == target_row)
         .collect::<HashSet<_>>()
         .len()
 }
