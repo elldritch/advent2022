@@ -1,4 +1,4 @@
-use std::{collections::HashSet, process::exit};
+use std::{collections::HashSet, process::exit, time::SystemTime};
 
 use nom::{
     bytes::complete::tag,
@@ -41,34 +41,32 @@ pub fn part2(input: String) -> i32 {
 }
 
 fn part2_solve(search_area: i32, input: &str) -> i32 {
-    let sensors = super::shared::must_parse(parse, input);
-
-    // For each sensor, compute its excluded positions.
-    let excluded = sensors
+    let sensors = super::shared::must_parse(parse, input)
         .into_iter()
-        .flat_map(
+        .map(
             |Sensor {
                  position,
                  closest_beacon,
-             }| {
-                let distance = manhattan(position, closest_beacon);
-                (position.0 - distance..=position.0 + distance)
-                    .flat_map(move |x| {
-                        (position.1 - distance..=position.1 + distance).map(move |y| (x, y))
-                    })
-                    .filter(move |candidate| manhattan(position, *candidate) <= distance)
-            },
+             }| (position, manhattan(position, closest_beacon)),
         )
-        .collect::<HashSet<_>>();
+        .collect::<Vec<_>>();
 
-    for x in 0..=search_area {
-        for y in 0..=search_area {
-            if !excluded.contains(&(x, y)) {
-                return x * 4_000_000 + y;
+    let start = SystemTime::now();
+    for y in 0..=search_area {
+        if y % 100 == 0 {
+            let elapsed = start.elapsed().unwrap();
+            println!("{y:?} {elapsed:?}");
+        }
+        'search: for x in 0..=search_area {
+            for (position, distance) in &sensors {
+                if manhattan(*position, (x, y)) <= *distance {
+                    continue 'search;
+                }
             }
+            return x * 4_000_000 + y;
         }
     }
-    println!("Impossible: no valid solutions detected");
+    println!("Invalid: no possible positions for distress beacon");
     exit(1)
 }
 
