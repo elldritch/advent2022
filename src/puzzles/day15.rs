@@ -41,33 +41,90 @@ pub fn part2(input: String) -> i32 {
 }
 
 fn part2_solve(search_area: i32, input: &str) -> i32 {
-    let sensors = super::shared::must_parse(parse, input)
+    let start = SystemTime::now();
+    let sensors = super::shared::must_parse(parse, input);
+    println!(
+        "{:?} | Parsed {} sensor readings",
+        start.elapsed().unwrap(),
+        sensors.len()
+    );
+
+    // The key insight: since there's only a single possible position for a
+    // distress beacon, that position must be exactly one tile just outside a
+    // covered position. Otherwise, there would be multiple possible positions
+    // for a distress beacon!
+    //
+    // Rather than searching the entire space, we can instead limit our search
+    // to all tiles that are just outside covered sensor range, which is equal
+    // to all tiles that are distance+1 from a sensor.
+    let mut candidates = sensors
+        .clone()
         .into_iter()
         .map(
             |Sensor {
                  position,
                  closest_beacon,
-             }| (position, manhattan(position, closest_beacon)),
-        )
-        .collect::<Vec<_>>();
-
-    let start = SystemTime::now();
-    for y in 0..=search_area {
-        if y % 100 == 0 {
-            let elapsed = start.elapsed().unwrap();
-            println!("{y:?} {elapsed:?}");
-        }
-        'search: for x in 0..=search_area {
-            for (position, distance) in &sensors {
-                if manhattan(*position, (x, y)) <= *distance {
-                    continue 'search;
+             }| {
+                println!(
+                    "{:?} | Calculating candidates for sensor at {:?}",
+                    start.elapsed().unwrap(),
+                    position
+                );
+                let distance = manhattan(position, closest_beacon);
+                // Map a sensor to the set of boundary tiles that are candidates for
+                // the distress beacon's position.
+                let mut candidates = HashSet::new();
+                let (x, y) = position;
+                let left_bound = x - (distance + 1);
+                for i in left_bound..=x {
+                    candidates.insert((i, y + (i - left_bound)));
+                    candidates.insert((i, y - (i - left_bound)));
                 }
+                let right_bound = x + (distance + 1);
+                for i in x..=right_bound {
+                    candidates.insert((i, y + (right_bound - i)));
+                    candidates.insert((i, y - (right_bound - i)));
+                }
+                candidates
+                    .into_iter()
+                    .filter(|(x, y)| *x > 0 && *x <= search_area && *y > 0 && *y <= search_area)
+                    .collect::<HashSet<_>>()
+            },
+        )
+        .reduce(|acc, candidates| {
+            println!("{:?} | Reducing with {} accumulated candidates", start.elapsed().unwrap(), acc.len());
+            acc.union(&candidates).copied().collect()
+        })
+        .unwrap_or_else(|| {
+            println!("Impossible: no sensor readings");
+            exit(1)
+        });
+
+    println!("{:?} | Found {} candidates", start.elapsed().unwrap(), candidates.len());
+
+    for Sensor {
+        position,
+        closest_beacon,
+    } in &sensors
+    {
+        println!("{:?} | Filtering for sensor at {:?}", start.elapsed().unwrap(), position);
+        let distance = manhattan(*position, *closest_beacon);
+        let mut filtered_candidates = candidates.clone();
+        for candidate in candidates {
+            if manhattan(*position, candidate) <= distance {
+                filtered_candidates.remove(&candidate);
             }
-            return x * 4_000_000 + y;
         }
+        println!("{:?} | After filtering, {} candidates remain", start.elapsed().unwrap(), filtered_candidates.len());
+        candidates = filtered_candidates;
     }
-    println!("Invalid: no possible positions for distress beacon");
-    exit(1)
+
+    assert_eq!(candidates.len(), 1);
+    let (x, y) = candidates.drain().next().unwrap_or_else(|| {
+        println!("Impossible: no distress beacon candidates");
+        exit(1)
+    });
+    x * 4_000_000 + y
 }
 
 fn manhattan(a: Position, b: Position) -> i32 {
@@ -76,7 +133,7 @@ fn manhattan(a: Position, b: Position) -> i32 {
 
 type Position = (i32, i32);
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 struct Sensor {
     position: Position,
     closest_beacon: Position,
